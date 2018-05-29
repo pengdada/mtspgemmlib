@@ -2,7 +2,7 @@ Sparse General Matrix-Matrix Multiplication for multi-core CPU and Intel KNL
 ======
 
 # Versions
-1.0 (April, 2018)
+1.0 (May, 2018)
 
 
 # Introduction
