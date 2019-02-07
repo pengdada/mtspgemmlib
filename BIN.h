@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <immintrin.h>
-#include <zmmintrin.h>
 #include <algorithm>
 
 #include "utility.h"

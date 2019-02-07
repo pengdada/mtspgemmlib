@@ -32,6 +32,7 @@ int MKLSpGEMM_symbolic(const CSR<IT,double> &A, const CSR<IT,double> &B, CSR<IT,
                     B.values, B.colids, B.rowptr,
                     NULL, NULL, C.rowptr,
                     NULL, &info);
+    return info;
 }
 
 template <bool sortOutput, typename IT>
