@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <immintrin.h>
-#include <zmmintrin.h>
+#include <x86intrin.h>
 #include <algorithm>
 
 #include "utility.h"

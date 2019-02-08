@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <tuple>
+#include <random>
 #include "Deleter.h"
 #include "HeapEntry.h"
 
