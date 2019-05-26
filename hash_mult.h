@@ -20,6 +20,9 @@
 
 #define VECTORIZE
 
+/*
+ * Symbolic phase in Hash SpGEMM.
+ */
 template <class IT, class NT>
 inline void hash_symbolic_kernel(const IT *arpt, const IT *acol, const IT *brpt, const IT *bcol, BIN<IT, NT> &bin)
 {
@@ -53,7 +56,7 @@ inline void hash_symbolic_kernel(const IT *arpt, const IT *acol, const IT *brpt,
                     for (k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
                         key = bcol[k];
                         hash = (key * HASH_SCAL) & (SH_ROW - 1);
-                        while (1) {
+                        while (1) { // Loop for hash probing
                             if (check[hash] == key) {
                                 break;
                             }
@@ -74,6 +77,10 @@ inline void hash_symbolic_kernel(const IT *arpt, const IT *acol, const IT *brpt,
     }
 }
 
+/*
+ * Symbolic phase for Hash Vector SpGEMM
+ * This function is optimized for 32-bit integer with AVX-512.
+ */
 template <class NT>
 inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int *brpt, const int *bcol, BIN<int, NT> &bin)
 {
@@ -118,7 +125,7 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
 #ifdef VECTORIZE
                         key_m = _mm512_set1_epi32(key);
 #endif
-                        while (1) {
+                        while (1) { // Loop for hash probing
 #ifdef VECTORIZE
                             check_m = _mm512_load_epi32(check + hash);
                             mask_m = _mm512_cmp_epi32_mask(key_m, check_m, _MM_CMPINT_EQ);
@@ -169,6 +176,10 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
     }
 }
 
+/*
+ * Symbolic phase for Hash Vector SpGEMM
+ * This function is optimized for 64-bit integer with AVX-512.
+ */
 template <class NT>
 inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long int *acol, const long long int *brpt, const long long int *bcol, BIN<long long int, NT> &bin)
 {
@@ -213,7 +224,7 @@ inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long 
 #ifdef VECTORIZE
                         key_m = _mm512_set1_epi64(key);
 #endif
-                        while (1) {
+                        while (1) { // loop for hash probing
 #ifdef VECTORIZE
                             check_m = _mm512_load_epi64(check + hash);
                             mask_m = _mm512_cmp_epi64_mask(key_m, check_m, _MM_CMPINT_EQ);
@@ -264,6 +275,7 @@ inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long 
     }
 }
 
+// Reference function for Symbolic phase of Hash SpGEMM
 template <bool vectorProbing, class IT, class NT>
 inline void hash_symbolic(const IT *arpt, const IT *acol, const IT *brpt, const IT *bcol, IT *crpt, BIN<IT, NT> &bin, const IT nrow, IT *nnz)
 {
@@ -280,12 +292,19 @@ inline void hash_symbolic(const IT *arpt, const IT *acol, const IT *brpt, const 
     *nnz = crpt[nrow];
 }
 
+/*
+ * Used for sort function.
+ * Elements are sorted in ascending order.
+ */
 template <typename IT, typename NT>
 bool sort_less(const pair<IT, NT> &left,const pair<IT, NT> &right)
 {
     return left.first < right.first;
 }
 
+/*
+ * Numeric phase in Hash SpGEMM.
+ */
 template <bool sortOutput, typename IT, typename NT, typename MultiplyOperation, typename AddOperation>
 inline void hash_numeric(const IT *arpt, const IT *acol, const NT *aval, const IT *brpt, const IT *bcol, const NT *bval, const IT *crpt, IT *ccol, NT *cval, const BIN<IT, NT> &bin, const MultiplyOperation multop, const AddOperation addop)
 {
@@ -326,7 +345,7 @@ inline void hash_numeric(const IT *arpt, const IT *acol, const NT *aval, const I
                         t_val = multop(t_aval, bval[k]);
                         key = bcol[k];
                         hash = (key * HASH_SCAL) & (SH_ROW - 1);
-                        while (1) {
+                        while (1) { // Loop for hash probing
                             if (shared_check[hash] == key) {
                                 shared_value[hash] = addop(t_val, shared_value[hash]);
                                 break;
@@ -343,6 +362,7 @@ inline void hash_numeric(const IT *arpt, const IT *acol, const NT *aval, const I
                     }
                 }
                 index = 0;
+                // Sort elements in ascending order if necessary, and store them as output matrix
                 if (sortOutput) {
                     IT nz = crpt[i + 1] - offset;
                     vector<pair<IT, NT>> p_vec(nz);
@@ -371,6 +391,10 @@ inline void hash_numeric(const IT *arpt, const IT *acol, const NT *aval, const I
     }
 }
 
+/*
+ * Numeric phase for Hash Vector SpGEMM
+ * This function is optimized for 32-bit integer with AVX-512.
+ */
 template <bool sortOutput, typename NT, typename MultiplyOperation, typename AddOperation>
 inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, const int *brpt, const int *bcol, const NT *bval, const int *crpt, int *ccol, NT *cval, const BIN<int, NT> &bin, MultiplyOperation multop, AddOperation addop)
 {
@@ -424,7 +448,7 @@ inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, c
 #ifdef VECTORIZE
                         key_m = _mm512_set1_epi32(key);
 #endif
-                        while (1) {
+                        while (1) { // loop for hash probing
 #ifdef VECTORIZE
                             check_m = _mm512_load_epi32(shared_check + hash);
                             mask_m = _mm512_cmp_epi32_mask(key_m, check_m, _MM_CMPINT_EQ);
@@ -475,6 +499,7 @@ inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, c
                 }
         
                 index = 0;
+                // Sort elements in ascending order if necessary, and store them as output matrix
                 if (sortOutput) {
                     int nz = crpt[i + 1] - offset;
                     vector<pair<int, NT>> p_vec(nz);
@@ -503,6 +528,10 @@ inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, c
     }
 }
 
+/*
+ * Numeric phase for Hash Vector SpGEMM
+ * This function is optimized for 64-bit integer with AVX-512.
+ */
 template <bool sortOutput, typename NT, typename MultiplyOperation, typename AddOperation>
 inline void hash_numeric_vec(const long long int *arpt, const long long int *acol, const NT *aval, const long long int *brpt, const long long int *bcol, const NT *bval, const long long int *crpt, long long int *ccol, NT *cval, const BIN<long long int, NT> &bin, MultiplyOperation multop, AddOperation addop)
 {
@@ -556,7 +585,7 @@ inline void hash_numeric_vec(const long long int *arpt, const long long int *aco
 #ifdef VECTORIZE
                         key_m = _mm512_set1_epi64(key);
 #endif
-                        while (1) {
+                        while (1) { // loop for hash probing
 #ifdef VECTORIZE
                             check_m = _mm512_load_epi64(shared_check + hash);
                             mask_m = _mm512_cmp_epi64_mask(key_m, check_m, _MM_CMPINT_EQ);
@@ -607,6 +636,7 @@ inline void hash_numeric_vec(const long long int *arpt, const long long int *aco
                 }
         
                 index = 0;
+                // Sort elements in ascending order if necessary, and store them as output matrix
                 if (sortOutput) {
                     long long int nz = crpt[i + 1] - offset;
                     vector<pair<long long int, NT>> p_vec(nz);
@@ -635,6 +665,10 @@ inline void hash_numeric_vec(const long long int *arpt, const long long int *aco
     }
 }
 
+/*
+ * Executing Hash SpGEMM
+ * The function starts with initialization of hash table followed by symbolic phase and numeric phase with hash table.
+ */
 template <bool vectorProbing, bool sortOutput, typename IT, typename NT, typename MultiplyOperation, typename AddOperation>
 void HashSpGEMM(const CSR<IT, NT> &a, const CSR<IT, NT> &b, CSR<IT, NT> &c, MultiplyOperation multop, AddOperation addop)
 {
@@ -667,6 +701,9 @@ void HashSpGEMM(const CSR<IT, NT> &a, const CSR<IT, NT> &b, CSR<IT, NT> &c, Mult
     }
 }
 
+/*
+ * Hash SpGEMM functions called without full template values
+ */
 template <bool sortOutput, typename IT, typename NT, typename MultiplyOperation, typename AddOperation>
 void HashSpGEMM(const CSR<IT, NT> &a, const CSR<IT, NT> &b, CSR<IT, NT> &c, MultiplyOperation multop, AddOperation addop)
 {
