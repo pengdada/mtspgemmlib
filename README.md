@@ -14,14 +14,19 @@ Sparse matrix computation is a key kernel of many applications. This library pro
 # Requirement
 Intel Compiler 18.0.1
 
-# Main components for SpGEMM
-CSC.h: the data structure of CSC format is implemented  
-CSR.h the data structure of CSR format is implemented  
-hash_mult.h: Hash SpGEMM and HashVector SpGEMM are implemented. The code is optimized for Intel KNL.  
-Hash_mult_hw.h: Hash SpGEMM and HashVector SpGEMM are implemented. The code is optimized for Haswell CPU.  
-heap_mult.h: Heap SpGEMM is implemented.  
-multiply.h: SpGEMM function with Intel MKL is prepared.  
-files under sample directory: Sample codes with main function generate matrix data with R-MAT or by reading matrix data files, and then compute SpGEMM.  
+# Components
+### Data structure
+*CSC.h*: the data structure of CSC format is implemented  
+*CSR.h*: the data structure of CSR format is implemented  
+
+### SpGEMM functions
+*hash_mult.h*: Hash SpGEMM and HashVector SpGEMM are implemented. The code is optimized for Intel KNL.  
+*Hash_mult_hw.h*: Hash SpGEMM and HashVector SpGEMM are implemented. The code is optimized for Haswell CPU.  
+*heap_mult.h*: Heap SpGEMM is implemented.  
+*multiply.h*: SpGEMM function with Intel MKL is prepared.  
+
+### Sample codes
+*files under sample directory*: Sample codes with main function generate matrix data with R-MAT or by reading matrix data files, and then compute SpGEMM.  
 
 # Preparation
 To use this library, the first thing you need to do is to modify the Makefile with correct path to Intel Compiler.
