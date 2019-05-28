@@ -273,6 +273,10 @@ inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long 
 }
 
 #else
+/*
+ * Symbolic phase for Hash Vector SpGEMM
+ * This function is optimized for 32-bit integer with AVX2.
+ */
 template <class NT>
 inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int *brpt, const int *bcol, BIN<int, NT> &bin)
 {
@@ -290,7 +294,6 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
         int *check = bin.local_hash_table_id[tid];
         
         for (int i = start_row; i < end_row; ++i) {
-            int j, k;
 #ifdef VECTORIZE
             __m256i key_m, check_m;
             __m256i mask_m;
@@ -302,13 +305,13 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
             if (bid > 0) {
                 int table_size = MIN_HT_S << (bid - 1);
                 int ht_size = table_size >> VEC_LENGTH_BIT;
-                for (j = 0; j < table_size; ++j) {
+                for (int j = 0; j < table_size; ++j) {
                     check[j] = -1;
                 }
 
-                for (j = arpt[i]; j < arpt[i + 1]; ++j) {
+                for (int j = arpt[i]; j < arpt[i + 1]; ++j) {
                     int t_acol = acol[j];
-                    for (k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
+                    for (int k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
                         int key = bcol[k];
                         int hash = (key * HASH_SCAL) & (ht_size - 1);
 #ifdef VECTORIZE
@@ -377,38 +380,33 @@ inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long 
     
 #pragma omp parallel
     {
-        long long int i, tid, start_row, end_row;
-        tid = omp_get_thread_num();
-        start_row = bin.rows_offset[tid];
-        end_row = bin.rows_offset[tid + 1];
+        long long int tid = omp_get_thread_num();
+        long long int start_row = bin.rows_offset[tid];
+        long long int end_row = bin.rows_offset[tid + 1];
         
         long long int *check = bin.local_hash_table_id[tid];
         
-        for (i = start_row; i < end_row; ++i) {
-            long long int j, k, bid;
-            long long int key, hash;
-            long long int nz, ht_size, table_size;
-            long long int t_acol;
+        for (long long int i = start_row; i < end_row; ++i) {
 #ifdef VECTORIZE
             __m256i key_m, check_m;
             __m256i mask_m;
             int mask;
 #endif        
-            nz = 0;
-            bid = bin.bin_id[i];
+            long long int nz = 0;
+            long long int bid = bin.bin_id[i];
             
             if (bid > 0) {
-                table_size = MIN_HT_S << (bid - 1);
-                ht_size = table_size >> VEC_LENGTH_LONG_BIT;
-                for (j = 0; j < table_size; ++j) {
+                long long int table_size = MIN_HT_S << (bid - 1);
+                long long int ht_size = table_size >> VEC_LENGTH_LONG_BIT;
+                for (long long int j = 0; j < table_size; ++j) {
                     check[j] = -1;
                 }
                 
-                for (j = arpt[i]; j < arpt[i + 1]; ++j) {
-                    t_acol = acol[j];
-                    for (k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
-                        key = bcol[k];
-                        hash = (key * HASH_SCAL) & (ht_size - 1);
+                for (long long int j = arpt[i]; j < arpt[i + 1]; ++j) {
+                    long long int t_acol = acol[j];
+                    for (long long int k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
+                        long long int key = bcol[k];
+                        long long int hash = (key * HASH_SCAL) & (ht_size - 1);
 #ifdef VECTORIZE
                         key_m = _mm256_set1_epi64x(key);
 #endif
@@ -494,7 +492,7 @@ bool sort_less(const pair<IT, NT> &left,const pair<IT, NT> &right)
 
 /*
  * After calculating on each hash table, sort them in ascending order if necessary, and then store them as output matrix
- * This function is used in hash_numeric function.
+ * This function is used in hash_numeric* function.
  * the actual indices of colids and values of output matrix are rpt[rowid];
  */
 template <bool sortOutput, typename IT, typename NT>
@@ -803,44 +801,37 @@ inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, c
 
 #pragma omp parallel
     {
-        int max_table_size = 0;
-
-        int i, tid, start_row, end_row;
-        tid = omp_get_thread_num();
-        start_row = bin.rows_offset[tid];
-        end_row = bin.rows_offset[tid + 1];
+        int tid = omp_get_thread_num();
+        int start_row = bin.rows_offset[tid];
+        int end_row = bin.rows_offset[tid + 1];
 
         int *ht_check = bin.local_hash_table_id[tid];
         NT *ht_value = bin.local_hash_table_val[tid];
 
-        for (i = start_row; i < end_row; ++i) {
-            int j, k, bid;
-            int ht_size, table_size;
-            int t_acol, hash, key, offset, index;
-            NT t_aval, t_val;
+        for (int i = start_row; i < end_row; ++i) {
 #ifdef VECTORIZE
             __m256i key_m, check_m, mask_m;
             int mask;
 #endif            
-            bid = bin.bin_id[i];
+            int bid = bin.bin_id[i];
 
             if (bid > 0) {
-                offset = crpt[i];
-                table_size = MIN_HT_N << (bid - 1);
-                ht_size = table_size >> VEC_LENGTH_BIT;
+                int offset = crpt[i];
+                int table_size = MIN_HT_N << (bid - 1);
+                int ht_size = table_size >> VEC_LENGTH_BIT;
 
-                for (j = 0; j < table_size; ++j) {
+                for (int j = 0; j < table_size; ++j) {
                     ht_check[j] = -1;
                 }
   
-                for (j = arpt[i]; j < arpt[i + 1]; ++j) {
-                    t_acol = acol[j];
-                    t_aval = aval[j];
-                    for (k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
-                        t_val = multop(t_aval, bval[k]);
+                for (int j = arpt[i]; j < arpt[i + 1]; ++j) {
+                    int t_acol = acol[j];
+                    NT t_aval = aval[j];
+                    for (int k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
+                        NT t_val = multop(t_aval, bval[k]);
 	
-                        key = bcol[k];
-                        hash = (key * HASH_SCAL) & (ht_size - 1);
+                        int key = bcol[k];
+                        int hash = (key * HASH_SCAL) & (ht_size - 1);
 #ifdef VECTORIZE
                         key_m = _mm256_set1_epi32(key);
 #endif
@@ -911,44 +902,36 @@ inline void hash_numeric_vec(const long long int *arpt, const long long int *aco
 
 #pragma omp parallel
     {
-        long long int max_table_size = 0;
-
-        long long int i, tid, start_row, end_row;
-        tid = omp_get_thread_num();
-        start_row = bin.rows_offset[tid];
-        end_row = bin.rows_offset[tid + 1];
+        long long int tid = omp_get_thread_num();
+        long long int start_row = bin.rows_offset[tid];
+        long long int end_row = bin.rows_offset[tid + 1];
 
         long long int *ht_check = bin.local_hash_table_id[tid];
         NT *ht_value = bin.local_hash_table_val[tid];
 
-        for (i = start_row; i < end_row; ++i) {
-            long long int j, k, bid;
-            long long int ht_size, table_size;
-            long long int t_acol, hash, key, offset, index;
-            NT t_aval, t_val;
+        for (long long int i = start_row; i < end_row; ++i) {
 #ifdef VECTORIZE
             __m256i key_m, check_m, mask_m;
             int mask;
 #endif            
-            bid = bin.bin_id[i];
+            long long int bid = bin.bin_id[i];
 
             if (bid > 0) {
-                offset = crpt[i];
-                table_size = MIN_HT_N << (bid - 1);
-                ht_size = table_size >> VEC_LENGTH_LONG_BIT;
+                long long int offset = crpt[i];
+                long long int table_size = MIN_HT_N << (bid - 1);
+                long long int ht_size = table_size >> VEC_LENGTH_LONG_BIT;
 
-                for (j = 0; j < table_size; ++j) {
+                for (long long int j = 0; j < table_size; ++j) {
                     ht_check[j] = -1;
                 }
   
-                for (j = arpt[i]; j < arpt[i + 1]; ++j) {
-                    t_acol = acol[j];
-                    t_aval = aval[j];
-                    for (k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
-                        t_val = multop(t_aval, bval[k]);
-	
-                        key = bcol[k];
-                        hash = (key * HASH_SCAL) & (ht_size - 1);
+                for (long long int j = arpt[i]; j < arpt[i + 1]; ++j) {
+                    long long int t_acol = acol[j];
+                    NT t_aval = aval[j];
+                    for (long long int k = brpt[t_acol]; k < brpt[t_acol + 1]; ++k) {
+                        NT t_val = multop(t_aval, bval[k]);
+                        long long int key = bcol[k];
+                        long long int hash = (key * HASH_SCAL) & (ht_size - 1);
 #ifdef VECTORIZE
                         key_m = _mm256_set1_epi64x(key);
 #endif
@@ -1001,9 +984,9 @@ inline void hash_numeric_vec(const long long int *arpt, const long long int *aco
                         }
                     }
                 }
-                sort_and_store_table2mat<sortOutput, int, NT>(ht_check, ht_value,
-                                                              ccol + offset, cval + offset,
-                                                              crpt[i + 1] - offset, ht_size);
+                sort_and_store_table2mat<sortOutput, long long int, NT>(ht_check, ht_value,
+                                                                        ccol + offset, cval + offset,
+                                                                        crpt[i + 1] - offset, ht_size);
             }
         }
     }
