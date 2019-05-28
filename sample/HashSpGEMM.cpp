@@ -16,13 +16,7 @@
 #include "../CSR.h"
 #include "../multiply.h"
 
-#ifdef KNL_EXE
 #include "../hash_mult.h"
-#elif defined HW_EXE
-#include "../hash_mult_hw.h"
-#else
-#include "../hash_mult_hw.h"
-#endif
 #include "sample_common.hpp"
 
 using namespace std;
