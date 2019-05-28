@@ -79,7 +79,6 @@ public:
     void shuffleIds();
     CSC<IT,NT> SpRef (const vector<IT> & ri, const vector<IT> & ci);
     CSC<IT,NT> SpRef1 (const vector<IT> & ri, const vector<IT> & ci);
-    CSC<IT,NT> SpRef2 (const IT* ri, const IT rilen, const IT* ci, const IT cilen);
     void intersect (const IT* rowids_in, const NT* values_in, const IT len_in,
                     const IT* ri, const IT len_ri,
                     IT* rowids_out, NT* values_out, IT* len_out);
@@ -679,72 +678,4 @@ CSC<IT,NT> CSC<IT,NT>::SpRef (const vector<IT> & ri, const vector<IT> & ci)
     return refmat;
 }
 
-
-
-
-// write genereal purpose set-intersect
-// binary search is faster is one of the vectors is very large
-
-
-// we assume that ri and ci are sorted in ascending order
-// also assume that matrix sorted within column
-// output is another CSC
-// note that ri and ci might have repeated entries
-// behaviour is exactly similar to the matlab implementation
-template <class IT, class NT>
-CSC<IT,NT> CSC<IT,NT>::SpRef1 (const vector<IT> & ri, const vector<IT> & ci)
-{
-    if( (!ci.empty()) && (ci.back() > cols))
-    {
-        cerr << "Col indices out of bounds" << endl;
-        abort();
-    }
-    if( (!ri.empty()) && (ri.back() > rows))
-    {
-        cerr << "Row indices out of bounds" << endl;
-        abort();
-    }
-    
-    
-    BitMap bmap(ri.size()); // space requirement n bits
-    bmap.reset(); // this is time consuming .....
-    for(int i=0; i<ri.size(); i++)
-    {
-        bmap.set_bit(ri[i]);
-    }
-    
-    // first, count nnz in the result matrix
-    IT refnnz = 0;
-    for(int i=0; i<ci.size(); i++)
-    {
-        IT endIdx = colptr[ci[i]+1];
-        for(IT j=colptr[ci[i]]; j<endIdx; j++)
-        {
-            if(bmap.get_bit(rowids[j])) refnnz++;
-        }
-    }
-    
-    
-    // Next, allocate memory and save the result matrix
-    // This two-step implementation is better for multithreading
-    CSC refmat(refnnz, ri.size(), ci.size(), 0);
-    refmat.colptr[0] = 0;
-    IT idx=0;
-    for(int i=0; i<ci.size(); i++)
-    {
-        IT endIdx = colptr[ci[i]+1];
-        for(IT j=colptr[ci[i]]; j<endIdx; j++)
-        {
-            if(bmap.get_bit(rowids[j]))
-            {
-                refmat.values[idx] = values[j];
-                refmat.rowids[idx++] = rowids[j];
-            }
-        }
-        refmat.colptr[i+1] = idx;
-    }
-    
-    
-    return refmat;
-}
 #endif
