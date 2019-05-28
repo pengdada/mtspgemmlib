@@ -18,11 +18,10 @@ Intel Compiler 18.0.1
 ### Data structure
 *CSC.h*: the data structure of CSC format is implemented  
 *CSR.h*: the data structure of CSR format is implemented  
-*Bin.h*: the data structure for managing load balance in Hash SpGEMM
+*BIN.h*: the data structure for managing load balance in Hash SpGEMM
 
 ### SpGEMM functions
-*hash_mult.h*: Hash SpGEMM and HashVector SpGEMM are implemented. The code is optimized for Intel KNL.  
-*hash_mult_hw.h*: Hash SpGEMM and HashVector SpGEMM are implemented. The code is optimized for Haswell CPU.  
+*hash_mult.h*: Hash SpGEMM and HashVector SpGEMM are implemented. The code includes optimized kernels for KNL and for Haswell, respectively.
 *heap_mult.h*: Heap SpGEMM is implemented.  
 *multiply.h*: SpGEMM function with Intel MKL is prepared.  
 
