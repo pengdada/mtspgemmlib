@@ -6,7 +6,6 @@
 #include <cstdlib>
 #include <algorithm>
 #include <cassert>
-#include "Deleter.h"
 #include "CSC.h"
 #include "Triple.h"
 

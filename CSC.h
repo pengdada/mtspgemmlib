@@ -8,11 +8,9 @@
 #include <cassert>
 #include <tuple>
 #include <random>
-#include "Deleter.h"
 #include "HeapEntry.h"
 
 #include "utility.h"
-#include "BitMap.h"
 #include <numeric>
 
 #include "Triple.h"
@@ -78,7 +76,7 @@ public:
     void Sorted();
     void shuffleIds();
     CSC<IT,NT> SpRef (const vector<IT> & ri, const vector<IT> & ci);
-    CSC<IT,NT> SpRef1 (const vector<IT> & ri, const vector<IT> & ci);
+    CSC<IT,NT> SpRef2 (const IT* ri, const IT rilen, const IT* ci, const IT cilen);
     void intersect (const IT* rowids_in, const NT* values_in, const IT len_in,
                     const IT* ri, const IT len_ri,
                     IT* rowids_out, NT* values_out, IT* len_out);
