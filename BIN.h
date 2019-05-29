@@ -6,8 +6,10 @@
 
 #include "utility.h"
 
-
-/* Manage the grouping */
+/*
+ * Manage the group
+ * prepare hash table for each group
+ */
 template <class IT, class NT>
 class BIN
 {
@@ -47,13 +49,13 @@ public:
         my_free<NT*>(local_hash_table_val);
     }
 
-    void set_intprod_num(const IT *arpt, const IT *acol, const IT *brpt, const IT rows);
-    void set_rows_offset(const IT rows);
-    void create_local_hash_table(const IT cols);
-    void create_global_hash_table(const IT cols);
-    void set_bin_id(const IT rows, const IT cols, const IT min);
     void set_max_bin(const IT *arpt, const IT *acol, const IT *brpt, const IT rows, const IT cols);
     void set_min_bin(const IT rows, const IT cols);
+    void create_local_hash_table(const IT cols);
+    
+    void set_intprod_num(const IT *arpt, const IT *acol, const IT *brpt, const IT rows);
+    void set_rows_offset(const IT rows);
+    void set_bin_id(const IT rows, const IT cols, const IT min);
 
     long long int total_intprod;
     IT max_intprod;
@@ -61,28 +63,24 @@ public:
     IT thread_num;
     IT min_ht_size;
 
-    IT *row_nz;
-    IT *rows_offset;
+    IT *row_nz; // the number of flop or non-zero elements of output matrix
+    IT *rows_offset; // offset for row_nz
     char *bin_id;
     IT **local_hash_table_id;
     NT **local_hash_table_val;
-    IT *hash_table_id;
-    NT *hash_table_val;
-    IT *hash_table_ptr;
 };
 
+/* Count the number of intermediate products per row (= flop / 2) */
 template <class IT, class NT>
 inline void BIN<IT, NT>::set_intprod_num(const IT *arpt, const IT *acol, const IT *brpt, const IT rows)
 {
 #pragma omp parallel
     {
-        int i;
         IT each_int_prod = 0;
 #pragma omp for
-        for (i = 0; i < rows; ++i) {
-            int j;
+        for (IT i = 0; i < rows; ++i) {
             IT nz_per_row = 0;
-            for (j = arpt[i]; j < arpt[i + 1]; ++j) {
+            for (IT j = arpt[i]; j < arpt[i + 1]; ++j) {
                 nz_per_row += brpt[acol[j] + 1] - brpt[acol[j]];
             }
             row_nz[i] = nz_per_row;
@@ -93,6 +91,9 @@ inline void BIN<IT, NT>::set_intprod_num(const IT *arpt, const IT *acol, const I
     }
 }
 
+/* Get total number of floating operations and average
+ * then, use it for assigning rows to thread as the amount of work is equally distributed
+ */
 template <class IT, class NT>
 inline void BIN<IT, NT>::set_rows_offset(const IT rows)
 {
@@ -117,6 +118,10 @@ inline void BIN<IT, NT>::set_rows_offset(const IT rows)
     my_free<IT>(ps_row_nz);
 }
 
+/*
+ * Prepare hash table for each thread_num
+ * once allocate memory space for hash table, the thread reuse it for each row
+ */
 template <class IT, class NT>
 inline void BIN<IT, NT>::create_local_hash_table(const IT cols)
 {
@@ -124,9 +129,11 @@ inline void BIN<IT, NT>::create_local_hash_table(const IT cols)
     {
         int tid = omp_get_thread_num();
         IT ht_size = 0;
+        /* Get max size of hash table */
         for (IT j = rows_offset[tid]; j < rows_offset[tid + 1]; ++j) {
             if (ht_size < row_nz[j]) ht_size = row_nz[j];
         }
+        /* the size of hash table is aligned as 2^n */
         if (ht_size > 0) {
             if (ht_size > cols) ht_size = cols;
             int k = min_ht_size;
@@ -140,33 +147,10 @@ inline void BIN<IT, NT>::create_local_hash_table(const IT cols)
     }    
 }
 
-template <class IT, class NT>
-inline void BIN<IT, NT>::create_global_hash_table(const IT cols)
-{
-    IT *hash_table_size = my_malloc<IT>(thread_num);
-#pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        IT ht_size = 0;
-        for (IT j = rows_offset[tid]; j < rows_offset[tid + 1]; ++j) {
-            if (ht_size < row_nz[j]) ht_size = row_nz[j];
-        }
-        if (ht_size > 0) {
-            if (ht_size > cols) ht_size = cols;
-            int k = min_ht_size;
-            while (k < ht_size) {
-                k <<= 1;
-            }
-            ht_size = k;
-        }
-        hash_table_size[tid] = ht_size;
-    }
-    scan(hash_table_size, hash_table_ptr, thread_num + 1);
-    hash_table_id = my_malloc<IT>(hash_table_ptr[thread_num]);
-    hash_table_val = my_malloc<NT>(hash_table_ptr[thread_num]);
-    my_free<IT>(hash_table_size);
-}
-
+/*
+ * Precompute how many entries each row requires for the hash table
+ * the size is 2^bin_id
+ */
 template <class IT, class NT>
 inline void BIN<IT, NT>::set_bin_id(const IT rows, const IT cols, const IT min)
 {
@@ -189,6 +173,7 @@ inline void BIN<IT, NT>::set_bin_id(const IT rows, const IT cols, const IT min)
     }
 }
 
+/* grouping and preparing hash table based on the number of floating operations */
 template <class IT, class NT>
 inline void BIN<IT, NT>::set_max_bin(const IT *arpt, const IT *acol, const IT *brpt, const IT rows, const IT cols)
 {
@@ -197,6 +182,7 @@ inline void BIN<IT, NT>::set_max_bin(const IT *arpt, const IT *acol, const IT *b
     set_bin_id(rows, cols, min_ht_size);
 }
 
+/* Reset the size of hash table which each row requires */
 template <class IT, class NT>
 inline void BIN<IT, NT>::set_min_bin(const IT rows, const IT cols)
 {

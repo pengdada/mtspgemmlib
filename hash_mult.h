@@ -17,7 +17,7 @@
 #define VECTORIZE
 
 /* SpGEMM Specific Parameters */
-#define HASH_SCAL 107 // Set disjoint number to SH_SIZE
+#define HASH_SCAL 107 // Set disjoint number to hash table size (=2^n)
 
 #ifdef KNL_EXE
 #define MIN_HT_S 16 // minimum hash table size per row in symbolic phase
@@ -37,7 +37,7 @@
 #endif
 
 /*
- * Symbolic phase in Hash SpGEMM.
+ * Symbolic phase for Hash SpGEMM.
  */
 template <class IT, class NT>
 inline void hash_symbolic_kernel(const IT *arpt, const IT *acol, const IT *brpt, const IT *bcol, BIN<IT, NT> &bin)
@@ -129,7 +129,7 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
                         key_m = _mm512_set1_epi32(key);
 #endif
                         while (1) { // Loop for hash probing
-                            // check whether key is in hash table.
+                            // check whether the key is in hash table.
 #ifdef VECTORIZE
                             check_m = _mm512_load_epi32(check + hash);
                             mask_m = _mm512_cmp_epi32_mask(key_m, check_m, _MM_CMPINT_EQ);
@@ -149,9 +149,10 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
                             }
 #endif
                             else {
+                                // If the entry with same key cannot be found, check whether the chunk is filled or not
                                 int cur_nz;
 #ifdef VECTORIZE
-                                mask_m = _mm512_cmp_epi32_mask(check_m, init_m, _MM_CMPINT_NE);
+                                mask_m = _mm512_cmp_epi32_mask(check_m, init_m, _MM_CMPINT_NE)
                                 cur_nz = _popcnt32(mask_m);
 #else
                                 cur_nz = VEC_LENGTH;
@@ -162,12 +163,12 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
                                     }
                                 }
 #endif
-                                if (cur_nz < VEC_LENGTH) {
+                                if (cur_nz < VEC_LENGTH) { //if it is not filled, push the entry to the table
                                     check[hash + cur_nz] = key;
                                     nz++;
                                     break;
                                 }
-                                else {
+                                else { // if is filled, check next chunk (linear probing)
                                     hash = (hash + VEC_LENGTH) & (table_size - 1);
                                 }
                             }
@@ -208,10 +209,10 @@ inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long 
             long long int bid = bin.bin_id[i];
             
             if (bid > 0) {
-                long long int table_size = MIN_HT_S << (bid - 1);
-                long long int ht_size = table_size >> VEC_LENGTH_LONG_BIT;
+                long long int table_size = MIN_HT_S << (bid - 1); // the number of entries per table
+                long long int ht_size = table_size >> VEC_LENGTH_LONG_BIT; // the number of chunks (1 chunk = VEC_LENGTH elments)
                 for (long long int j = 0; j < table_size; ++j) {
-                    check[j] = -1;
+                    check[j] = -1; // initialize hash table
                 }
                 for (long long int j = arpt[i]; j < arpt[i + 1]; ++j) {
                     long long int t_acol = acol[j];
@@ -222,6 +223,7 @@ inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long 
                         key_m = _mm512_set1_epi64(key);
 #endif
                         while (1) { // loop for hash probing
+                            // check whether the key is in hash table.
 #ifdef VECTORIZE
                             check_m = _mm512_load_epi64(check + hash);
                             mask_m = _mm512_cmp_epi64_mask(key_m, check_m, _MM_CMPINT_EQ);
@@ -241,6 +243,7 @@ inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long 
                             }
 #endif
                             else {
+                                // If the entry with same key cannot be found, check whether the chunk is filled or not
                                 long long int cur_nz;
 #ifdef VECTORIZE
                                 mask_m = _mm512_cmp_epi64_mask(check_m, init_m, _MM_CMPINT_NE);
@@ -254,12 +257,12 @@ inline void hash_symbolic_vec_kernel(const long long int *arpt, const long long 
                                     }
                                 }
 #endif
-                                if (cur_nz < VEC_LENGTH_LONG) {
+                                if (cur_nz < VEC_LENGTH_LONG) { //if it is not filled, push the entry to the table
                                     check[hash + cur_nz] = key;
                                     nz++;
                                     break;
                                 }
-                                else {
+                                else { // if is filled, check next chunk (linear probing)
                                     hash = (hash + VEC_LENGTH_LONG) & (table_size - 1);
                                 }
                             }
@@ -303,10 +306,10 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
             int bid = bin.bin_id[i];
             
             if (bid > 0) {
-                int table_size = MIN_HT_S << (bid - 1);
-                int ht_size = table_size >> VEC_LENGTH_BIT;
+                int table_size = MIN_HT_S << (bid - 1); // the number of entries per table
+                int ht_size = table_size >> VEC_LENGTH_BIT; // the number of chunks (1 chunk = VEC_LENGTH elments)
                 for (int j = 0; j < table_size; ++j) {
-                    check[j] = -1;
+                    check[j] = -1; // initialize hash table
                 }
 
                 for (int j = arpt[i]; j < arpt[i + 1]; ++j) {
@@ -317,7 +320,8 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
 #ifdef VECTORIZE
                         key_m = _mm256_set1_epi32(key);
 #endif
-                        while (1) {
+                        while (1) { // Loop for hash probing
+                            // check whether the key is in hash table.
 #ifdef VECTORIZE
                             check_m = _mm256_maskload_epi32(check + (hash << VEC_LENGTH_BIT), true_m);
                             mask_m = _mm256_cmpeq_epi32(key_m, check_m);
@@ -338,6 +342,7 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
                             }
 #endif
                             else {
+                                // If the entry with same key cannot be found, check whether the chunk is filled or not
                                 int cur_nz;
 #ifdef VECTORIZE
                                 mask_m = _mm256_cmpeq_epi32(check_m, init_m);
@@ -352,12 +357,12 @@ inline void hash_symbolic_vec_kernel(const int *arpt, const int *acol, const int
                                     }
                                 }
 #endif
-                                if (cur_nz < VEC_LENGTH) {
+                                if (cur_nz < VEC_LENGTH) { //if it is not filled, push the entry to the table
                                     check[(hash << VEC_LENGTH_BIT) + cur_nz] = key;
                                     nz++;
                                     break;
                                 }
-                                else {
+                                else { // if is filled, check next chunk (linear probing)
                                     hash = (hash + 1) & (ht_size - 1);
                                 }
                             }
@@ -611,11 +616,11 @@ inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, c
 
             if (bid > 0) {
                 int offset = crpt[i];
-                int table_size = MIN_HT_N << (bid - 1);
-                int ht_size = table_size >> VEC_LENGTH_BIT;
+                int table_size = MIN_HT_N << (bid - 1); // the number of entries per table
+                int ht_size = table_size >> VEC_LENGTH_BIT; // the number of chunks (1 chunk = VEC_LENGTH elments)
 
                 for (int j = 0; j < table_size; ++j) {
-                    ht_check[j] = -1;
+                    ht_check[j] = -1; // initialize hash table
                 }
   
                 for (int j = arpt[i]; j < arpt[i + 1]; ++j) {
@@ -629,6 +634,7 @@ inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, c
                         key_m = _mm512_set1_epi32(key);
 #endif
                         while (1) { // loop for hash probing
+                            // check whether the key is in hash table.
 #ifdef VECTORIZE
                             check_m = _mm512_load_epi32(ht_check + hash);
                             mask_m = _mm512_cmp_epi32_mask(key_m, check_m, _MM_CMPINT_EQ);
@@ -651,6 +657,7 @@ inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, c
                             }
 #endif
                             else {
+                                // If the entry with same key cannot be found, check whether the chunk is filled or not
                                 int cur_nz;
 #ifdef VECTORIZE
                                 mask_m = _mm512_cmp_epi32_mask(check_m, init_m, _MM_CMPINT_NE);
@@ -665,19 +672,18 @@ inline void hash_numeric_vec(const int *arpt, const int *acol, const NT *aval, c
                                     }
                                 }
 #endif
-                                if (cur_nz < VEC_LENGTH) {
+                                if (cur_nz < VEC_LENGTH) { //if it is not filled, push the entry to the table
                                     ht_check[hash + cur_nz] = key;
                                     ht_value[hash + cur_nz] = t_val;
                                     break;
                                 }
-                                else {
+                                else { // if is filled, check next chunk (linear probing)
                                     hash = (hash + VEC_LENGTH) & (table_size - 1);
                                 }
                             }
                         }
                     }
                 }
-        
                 sort_and_store_table2mat<sortOutput, int, NT>(ht_check, ht_value,
                                                               ccol + offset, cval + offset,
                                                               crpt[i + 1] - offset, ht_size);
