@@ -2,14 +2,14 @@ Sparse General Matrix-Matrix Multiplication for multi-core CPU and Intel KNL
 ======
 
 # Versions
-1.1 (May, 2019)
+1.2 (Jan, 2020)
 
 
 # Introduction
-Sparse matrix computation is a key kernel of many applications. This library provides fast sparse general vmatrix-matrix multiplication (SpGEMM) kernels for multi-core CPU and Intel KNL. More information can be found in (1).
+Sparse matrix computation is a key kernel of many applications. This library provides fast sparse general vmatrix-matrix multiplication (SpGEMM) kernels for multi-core CPU and Intel KNL. More information can be found in (1) and (2).
 
 (1) Yusuke Nagasaka, Satoshi Matsuoka, Ariful Azad, Aydin Buluc, "High-performance sparse matrix-matrix products on Intel KNL and multicore architectures", https://arxiv.org/abs/1804.01698
-
+(2) Yusuke Nagasaka, Satoshi Matsuoka, Ariful Azad, Aydin Buluc, "Performance optimization, modeling and analysis of sparse matrix-matrix products on multi-core and many-core processors", https://people.eecs.berkeley.edu/~aydin/spgemm_parco2019.pdf
 
 # Requirement
 Intel Compiler 18.0.1
